@@ -54,6 +54,34 @@ export const GET_COUNT_JOB = /* GraphQL */ `
 `;
 
 // ---------------------------------------------------------------------------
+// Subscriptions (real-time push over WebSocket)
+// ---------------------------------------------------------------------------
+
+export const SUBSCRIBE_TASK_DASHBOARD = /* GraphQL */ `
+  subscription ListenTaskDashboard($page: Int!, $limit: Int!, $search: String) {
+    listen_task_dashboard(page: $page, limit: $limit, search: $search) {
+      meta { page limit total_pages total_records }
+      data {
+        name module_name total_jobs is_loading
+        detail { queueing retrying success failure stopped }
+      }
+    }
+  }
+`;
+
+export const SUBSCRIBE_ALL_JOB = /* GraphQL */ `
+  subscription ListenAllJob($filter: GetAllJobInputResolver) {
+    listen_all_job(filter: $filter) {
+      meta { page limit total_pages total_records }
+      data {
+        id task_name arguments retries max_retry interval
+        status error result trace_id created_at finished_at
+      }
+    }
+  }
+`;
+
+// ---------------------------------------------------------------------------
 // Mutations
 // ---------------------------------------------------------------------------
 
@@ -153,6 +181,17 @@ export interface Task {
 
 export interface TaskListData {
   get_all_task: Task[];
+}
+
+export interface SubscribeTaskDashboardData {
+  listen_task_dashboard: {
+    meta: { page: number; limit: number; total_pages: number; total_records: number };
+    data: Task[];
+  };
+}
+
+export interface SubscribeAllJobData {
+  listen_all_job: { meta: JobMeta; data: Job[] };
 }
 
 // ---------------------------------------------------------------------------

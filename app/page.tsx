@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { gql, GET_ALL_TASK, ADD_JOB, RETRY_ALL_JOB, CLEAN_JOB, type TaskListData, type Task } from "@/lib/graphql";
+import { useSubscription } from "@/lib/useSubscription";
+import {
+  gql, GET_ALL_TASK, ADD_JOB, RETRY_ALL_JOB, CLEAN_JOB,
+  SUBSCRIBE_TASK_DASHBOARD,
+  type TaskListData, type Task, type SubscribeTaskDashboardData,
+} from "@/lib/graphql";
 
 const STATUS_TAG: Record<string, { label: string; cls: string }> = {
   queueing: { label: "Queueing", cls: "bg-gray-100 text-gray-700 border-gray-300" },
@@ -14,9 +19,6 @@ const STATUS_TAG: Record<string, { label: string; cls: string }> = {
 
 export default function Page() {
   const router = useRouter();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [addTask, setAddTask] = useState("");
   const [addArgs, setAddArgs] = useState("{}");
@@ -24,23 +26,18 @@ export default function Page() {
   const [addLoading, setAddLoading] = useState(false);
   const [search, setSearch] = useState("");
 
-  const fetchTasks = useCallback(async () => {
-    try {
-      const data = await gql<TaskListData>(GET_ALL_TASK);
-      setTasks(data.get_all_task);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to connect");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Real-time subscription — falls back to polling if WS unavailable
+  const { data: subData, loading, error } = useSubscription<SubscribeTaskDashboardData>({
+    query: SUBSCRIBE_TASK_DASHBOARD,
+    variables: { page: 1, limit: 100, search: search || null },
+    pollQuery: GET_ALL_TASK,
+    pollInterval: 3000,
+  });
 
-  useEffect(() => {
-    fetchTasks();
-    const id = setInterval(fetchTasks, 5000);
-    return () => clearInterval(id);
-  }, [fetchTasks]);
+  // Normalise data from either subscription or poll fallback
+  const tasks: Task[] = (subData as any)?.listen_task_dashboard?.data
+    ?? (subData as any)?.get_all_task
+    ?? [];
 
   const totals = tasks.reduce(
     (acc, t) => ({
@@ -61,7 +58,7 @@ export default function Page() {
       await gql(ADD_JOB, { param: { task_name: addTask, max_retry: addMaxRetry, args: addArgs } });
       setShowAdd(false);
       setAddArgs("{}");
-      await fetchTasks();
+      // subscription will auto-update
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to add job");
     } finally {
@@ -83,7 +80,7 @@ export default function Page() {
         <p className="text-gray-500 text-xs mt-4">
           Connecting to: <code className="bg-gray-100 px-1 rounded">{graphqlHost}</code>
         </p>
-        <button onClick={fetchTasks} className="mt-4 text-sm px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50">
+        <button onClick={() => window.location.reload()} className="mt-4 text-sm px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50">
           Retry connection
         </button>
       </div>
@@ -106,7 +103,7 @@ export default function Page() {
             {label}: <b>{value}</b>
           </span>
         ))}
-        {loading && <span className="text-xs text-gray-400 animate-pulse">refreshing…</span>}
+        {loading && <span className="text-xs text-gray-400 animate-pulse">connecting…</span>}
       </div>
 
       {/* Toolbar */}
@@ -178,7 +175,6 @@ export default function Page() {
                             onClick={async () => {
                               if (!confirm(`Retry all failure/stopped jobs for "${task.name}"?`)) return;
                               await gql(RETRY_ALL_JOB, { filter: { task_name: task.name, statuses: ["FAILURE", "STOPPED"] } });
-                              fetchTasks();
                             }}
                             className="w-full text-left px-4 py-2 text-xs hover:bg-gray-50 text-blue-600"
                           >
@@ -188,7 +184,6 @@ export default function Page() {
                             onClick={async () => {
                               if (!confirm(`Clear all success/failure/stopped jobs for "${task.name}"?`)) return;
                               await gql(CLEAN_JOB, { filter: { task_name: task.name, statuses: ["SUCCESS", "FAILURE", "STOPPED"] } });
-                              fetchTasks();
                             }}
                             className="w-full text-left px-4 py-2 text-xs hover:bg-gray-50 text-red-600"
                           >
@@ -205,7 +200,7 @@ export default function Page() {
         )}
       </div>
 
-      <p className="text-xs text-gray-400 text-center">Auto-refreshes every 5 seconds</p>
+      <p className="text-xs text-gray-400 text-center">Real-time via GraphQL subscriptions</p>
 
       {/* Add Job Modal */}
       {showAdd && (

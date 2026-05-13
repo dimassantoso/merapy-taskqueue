@@ -4,10 +4,11 @@ import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   gql, GET_ALL_JOB, GET_COUNT_JOB, ADD_JOB, RETRY_JOB, STOP_JOB, DELETE_JOB,
-  RETRY_ALL_JOB, CLEAN_JOB, STOP_ALL_JOB,
+  RETRY_ALL_JOB, CLEAN_JOB, STOP_ALL_JOB, SUBSCRIBE_ALL_JOB,
   STATUS_COLORS, canRetry, canStop,
-  type JobListData, type Job, type JobMeta,
+  type JobListData, type Job, type JobMeta, type SubscribeAllJobData,
 } from "@/lib/graphql";
+import { useSubscription } from "@/lib/useSubscription";
 
 const ALL_STATUSES = ["QUEUEING", "RETRYING", "SUCCESS", "FAILURE", "STOPPED"];
 
@@ -197,31 +198,35 @@ function TaskPage() {
   const page = parseInt(searchParams.get("page") ?? "1", 10);
   const searchParam = searchParams.get("search") ?? "";
 
-  const [jobData, setJobData] = useState<JobListData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
   const [search, setSearch] = useState(searchParam);
   const [modal, setModal] = useState<"add" | "retry" | "clean" | null>(null);
 
-  const fetchJobs = useCallback(async () => {
-    try {
-      const filter: Record<string, unknown> = { page, limit: 10, task_name: taskName };
-      if (statusFilter) filter.statuses = statusFilter.split(",");
-      if (search) filter.search = search;
-      const data = await gql<JobListData>(GET_ALL_JOB, { filter });
-      setJobData(data);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to connect");
-    } finally { setLoading(false); }
-  }, [page, taskName, statusFilter, search]);
+  // Build subscription filter
+  const subFilter = {
+    page,
+    limit: 10,
+    task_name: taskName || undefined,
+    statuses: statusFilter ? statusFilter.split(",") : undefined,
+    search: search || undefined,
+  };
 
-  useEffect(() => {
-    fetchJobs();
-    const id = setInterval(fetchJobs, 5000);
-    return () => clearInterval(id);
-  }, [fetchJobs]);
+  // Real-time subscription with polling fallback
+  const { data: subData, loading: subLoading, error: subError } = useSubscription<SubscribeAllJobData>({
+    query: SUBSCRIBE_ALL_JOB,
+    variables: { filter: subFilter },
+    pollQuery: GET_ALL_JOB,
+    pollInterval: 3000,
+  });
+
+  const loading = subLoading;
+  const error = subError;
+  const jobData = (subData as any)?.listen_all_job ?? (subData as any)?.get_all_job ?? null;
+
+  // fetchJobs is only needed for mutations that need immediate refresh
+  const fetchJobs = useCallback(async () => {
+    // subscription handles refresh automatically; this is a no-op hint
+  }, []);
 
   function setParam(key: string, value: string | undefined) {
     const params = new URLSearchParams(searchParams.toString());
@@ -255,8 +260,8 @@ function TaskPage() {
     fetchJobs();
   }
 
-  const jobs: Job[] = jobData?.get_all_job.data ?? [];
-  const meta: JobMeta = jobData?.get_all_job.meta ?? { page: 1, limit: 10, total_pages: 1, total_records: 0 };
+  const jobs: Job[] = jobData?.data ?? [];
+  const meta: JobMeta = jobData?.meta ?? { page: 1, limit: 10, total_pages: 1, total_records: 0 };
 
   return (
     <div className="space-y-5">
@@ -418,7 +423,7 @@ function TaskPage() {
         </div>
       )}
 
-      <p className="text-xs text-gray-400 text-center">Auto-refreshes every 5 seconds</p>
+      <p className="text-xs text-gray-400 text-center">Real-time via GraphQL subscriptions</p>
 
       {/* Modals */}
       {modal === "add" && (
