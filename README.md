@@ -1,36 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# kapynis-taskqueue-dashboard
 
-## Getting Started
+Dashboard for monitoring and managing [kapynis](https://github.com/dimassantoso/kapynis) task queue worker jobs.
 
-First, run the development server:
+## Requirements
+
+- Node.js 18+
+- A running kapynis service with `USE_TASK_QUEUE_WORKER=true`
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.sample .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Embedding into kapynis (one-time, for maintainers)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+This mirrors candi's `embed.FS` approach — the dashboard is bundled inside the kapynis package so users get it automatically with `pip install kapynis`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# From this repo, with ../kapynis pointing to the kapynis repo:
+make embed
 
-## Learn More
+# Or specify the kapynis path explicitly:
+make embed KAPYNIS_DIR=/path/to/kapynis
+```
 
-To learn more about Next.js, take a look at the following resources:
+Then commit the generated `dashboard_static/` directory in the kapynis repo.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Development
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev   # hot reload at http://localhost:3000
+```
 
-## Deploy on Vercel
+Set `NEXT_PUBLIC_GRAPHQL_HOST=http://localhost:8080/graphql` in `.env.local` (already the default).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## How it works
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+When `USE_TASK_QUEUE_WORKER=true`, the kapynis task queue worker automatically serves:
+- `http://localhost:8080/` — this dashboard UI
+- `http://localhost:8080/graphql` — GraphQL API
+
+No separate process needed — just `make run` in your service.
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NEXT_PUBLIC_GRAPHQL_HOST` | `http://localhost:8080/graphql` | kapynis task queue GraphQL endpoint |
+
+The GraphQL endpoint is served by the kapynis task queue worker on `TASK_QUEUE_DASHBOARD_PORT` (default `8080`).
+
+## Features
+
+- View all jobs with status, retries, arguments, and errors
+- Filter by task name and status
+- Retry failed/stopped jobs
+- Delete individual jobs
+- Bulk retry / clean by task + status
+- Pagination
+
+## Status values
+
+| Status | Meaning |
+|--------|---------|
+| `QUEUEING` | Waiting to be picked up |
+| `RETRYING` | Currently running / will retry |
+| `SUCCESS` | Completed successfully |
+| `FAILURE` | Failed after max retries |
+| `STOPPED` | Manually stopped |
