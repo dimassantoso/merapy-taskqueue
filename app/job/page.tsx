@@ -1,160 +1,183 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useCallback, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import StatusBadge from "@/components/StatusBadge";
+import { useSubscription } from "@/lib/useSubscription";
 import {
   gql, GET_ALL_JOB, RETRY_JOB, STOP_JOB, DELETE_JOB,
-  STATUS_COLORS, canRetry, canStop, type Job,
+  canRetry, canStop, type Job, type SubscribeAllJobData,
 } from "@/lib/graphql";
 
-interface JobDetailData {
-  get_all_job: { data: Job[] };
+const SUBSCRIBE_JOB = /* GraphQL */ `
+  subscription ListenAllJob($filter: GetAllJobInputResolver) {
+    listen_all_job(filter: $filter) {
+      data {
+        id task_name arguments retries max_retry interval
+        status error result trace_id created_at finished_at
+      }
+    }
+  }
+`;
+
+function prettyJson(s: string) {
+  try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; }
+}
+
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-[120px_1fr] gap-4 py-3 border-b border-gray-50 dark:border-gray-800 last:border-0">
+      <dt className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-0.5">{label}</dt>
+      <dd className="text-sm text-gray-900 dark:text-gray-100">{children}</dd>
+    </div>
+  );
 }
 
 function JobPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const jobId = searchParams.get("id") ?? "";
-
-  const [job, setJob] = useState<Job | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const fetchJob = useCallback(async () => {
-    if (!jobId) return;
-    try {
-      const data = await gql<JobDetailData>(GET_ALL_JOB, {
-        filter: { job_id: jobId, limit: 1 },
-      });
-      setJob(data.get_all_job.data[0] ?? null);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load job");
-    } finally { setLoading(false); }
-  }, [jobId]);
+  const { data: subData, loading, error } = useSubscription<SubscribeAllJobData>({
+    query: SUBSCRIBE_JOB,
+    variables: { filter: { job_id: jobId, limit: 1 } },
+    pollQuery: GET_ALL_JOB,
+    pollInterval: 3000,
+  });
 
-  useEffect(() => {
-    fetchJob();
-    const id = setInterval(fetchJob, 5000);
-    return () => clearInterval(id);
-  }, [fetchJob]);
+  const rawData = (subData as any)?.listen_all_job ?? (subData as any)?.get_all_job ?? null;
+  const job: Job | null = rawData?.data?.[0] ?? null;
 
-  async function handleRetry() {
-    if (!job) return;
+  async function act(fn: () => Promise<void>) {
     setActionLoading(true);
-    try { await gql(RETRY_JOB, { job_id: job.id }); await fetchJob(); }
-    finally { setActionLoading(false); }
+    try { await fn(); } finally { setActionLoading(false); }
   }
 
-  async function handleStop() {
-    if (!job) return;
-    setActionLoading(true);
-    try { await gql(STOP_JOB, { job_id: job.id }); await fetchJob(); }
-    finally { setActionLoading(false); }
+  if (loading && !job) {
+    return (
+      <div className="flex items-center justify-center min-h-[40vh]">
+        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
   }
 
-  async function handleDelete() {
-    if (!job || !confirm("Permanently delete this job?")) return;
-    setActionLoading(true);
-    try {
-      await gql(DELETE_JOB, { job_id: job.id });
-      router.push(`/task?task_name=${encodeURIComponent(job.task_name)}`);
-    } finally { setActionLoading(false); }
+  if (error && !job) {
+    return <div className="p-12 text-center text-red-500 dark:text-red-400 text-sm">{error}</div>;
   }
 
-  if (loading) return <div className="p-12 text-center text-gray-400">Loading…</div>;
-  if (error) return <div className="p-12 text-center text-red-500">{error}</div>;
-  if (!job) return <div className="p-12 text-center text-gray-400">Job not found</div>;
-
-  function prettyJson(s: string) {
-    try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; }
+  if (!job) {
+    return (
+      <div className="p-12 text-center">
+        <p className="text-gray-400 dark:text-gray-500 text-sm">Job not found</p>
+        <button onClick={() => router.back()}
+          className="mt-3 text-xs px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+          Go back
+        </button>
+      </div>
+    );
   }
-
-  const rows: [string, React.ReactNode][] = [
-    ["ID", <span className="font-mono text-sm break-all">{job.id}</span>],
-    ["Task Name", (
-      <button onClick={() => router.push(`/task?task_name=${encodeURIComponent(job.task_name)}`)}
-        className="text-indigo-600 hover:underline font-mono font-medium">{job.task_name}</button>
-    )],
-    ["Status", (
-      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${STATUS_COLORS[job.status] ?? "bg-gray-100 text-gray-600"}`}>
-        {job.status}
-      </span>
-    )],
-    ["Retries", `${job.retries} / ${job.max_retry}`],
-    ["Interval", job.interval || "—"],
-    ["Created At", job.created_at ? new Date(job.created_at).toLocaleString() : "—"],
-    ["Finished At", job.finished_at ? new Date(job.finished_at).toLocaleString() : "—"],
-    ["Trace ID", job.trace_id || "—"],
-    ["Arguments", (
-      <pre className="bg-gray-50 rounded-lg p-3 text-xs font-mono overflow-auto max-h-48 whitespace-pre-wrap border border-gray-200">
-        {prettyJson(job.arguments)}
-      </pre>
-    )],
-    ...(job.result ? [["Result", (
-      <pre className="bg-gray-50 rounded-lg p-3 text-xs font-mono overflow-auto max-h-48 whitespace-pre-wrap border border-gray-200">
-        {prettyJson(job.result)}
-      </pre>
-    )] as [string, React.ReactNode]] : []),
-    ...(job.error ? [["Last Error", (
-      <pre className="bg-red-50 text-red-700 rounded-lg p-3 text-xs font-mono overflow-auto max-h-48 whitespace-pre-wrap border border-red-200">
-        {job.error}
-      </pre>
-    )] as [string, React.ReactNode]] : []),
-  ];
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="max-w-2xl space-y-5">
       {/* Breadcrumb + actions */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2 text-sm">
-          <button onClick={() => router.push(`/task?task_name=${encodeURIComponent(job.task_name)}`)}
-            className="text-gray-500 hover:text-indigo-600">
-            ← {job.task_name}
+        <nav className="flex items-center gap-2 text-sm">
+          <button onClick={() => router.push("/")}
+            className="text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+            Dashboard
           </button>
-          <span className="text-gray-300">/</span>
-          <span className="font-semibold text-gray-800">Job Detail</span>
-        </div>
+          <span className="text-gray-300 dark:text-gray-600">/</span>
+          <button onClick={() => router.push(`/task?task_name=${encodeURIComponent(job.task_name)}`)}
+            className="text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-mono transition-colors">
+            {job.task_name}
+          </button>
+          <span className="text-gray-300 dark:text-gray-600">/</span>
+          <span className="text-gray-900 dark:text-white font-mono text-xs">{job.id.slice(0, 8)}…</span>
+          {loading && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />}
+        </nav>
 
         <div className="flex gap-2">
-          {/* Retry — only for FAILURE or STOPPED */}
           {canRetry(job.status) && (
-            <button onClick={handleRetry} disabled={actionLoading}
-              className="text-sm px-4 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 font-medium">
+            <button onClick={() => act(() => gql(RETRY_JOB, { job_id: job.id }))}
+              disabled={actionLoading}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium disabled:opacity-50 transition-colors">
               🔄 Retry
             </button>
           )}
-          {/* Stop — only for QUEUEING or RETRYING */}
           {canStop(job.status) && (
-            <button onClick={handleStop} disabled={actionLoading}
-              className="text-sm px-4 py-1.5 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 disabled:opacity-50 font-medium">
+            <button onClick={() => act(() => gql(STOP_JOB, { job_id: job.id }))}
+              disabled={actionLoading}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium disabled:opacity-50 transition-colors">
               ⏹ Stop
             </button>
           )}
-          {/* Delete — always available */}
-          <button onClick={handleDelete} disabled={actionLoading}
-            className="text-sm px-4 py-1.5 rounded-lg border border-red-300 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50">
+          <button onClick={async () => {
+            if (!confirm("Permanently delete this job?")) return;
+            await act(() => gql(DELETE_JOB, { job_id: job.id }));
+            router.push(`/task?task_name=${encodeURIComponent(job.task_name)}`);
+          }}
+            disabled={actionLoading}
+            className="px-3.5 py-2 rounded-lg border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 text-sm hover:bg-red-100 dark:hover:bg-red-900 disabled:opacity-50 transition-colors">
             🗑 Delete
           </button>
         </div>
       </div>
 
       {/* Detail card */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <tbody className="divide-y divide-gray-100">
-            {rows.map(([label, value]) => (
-              <tr key={label as string}>
-                <td className="px-5 py-3 font-semibold text-gray-500 w-32 align-top whitespace-nowrap">{label}</td>
-                <td className="px-5 py-3 text-gray-800">{value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+          <h1 className="font-semibold text-gray-900 dark:text-white">Job Detail</h1>
+          <StatusBadge status={job.status} size="md" />
+        </div>
+        <dl className="px-5">
+          <DetailRow label="ID">
+            <span className="font-mono text-xs break-all text-gray-700 dark:text-gray-300">{job.id}</span>
+          </DetailRow>
+          <DetailRow label="Task">
+            <button onClick={() => router.push(`/task?task_name=${encodeURIComponent(job.task_name)}`)}
+              className="font-mono text-indigo-600 dark:text-indigo-400 hover:underline">
+              {job.task_name}
+            </button>
+          </DetailRow>
+          <DetailRow label="Retries">
+            <span className="tabular-nums">{job.retries} / {job.max_retry}</span>
+          </DetailRow>
+          <DetailRow label="Interval">
+            <span className="text-gray-600 dark:text-gray-400">{job.interval || "—"}</span>
+          </DetailRow>
+          <DetailRow label="Created">
+            <span className="text-gray-600 dark:text-gray-400">{job.created_at ? new Date(job.created_at).toLocaleString() : "—"}</span>
+          </DetailRow>
+          <DetailRow label="Finished">
+            <span className="text-gray-600 dark:text-gray-400">{job.finished_at ? new Date(job.finished_at).toLocaleString() : "—"}</span>
+          </DetailRow>
+          {job.trace_id && (
+            <DetailRow label="Trace ID">
+              <span className="font-mono text-xs text-gray-600 dark:text-gray-400">{job.trace_id}</span>
+            </DetailRow>
+          )}
+          <DetailRow label="Arguments">
+            <pre className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-xs font-mono overflow-auto max-h-48 whitespace-pre-wrap text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-700">
+              {prettyJson(job.arguments)}
+            </pre>
+          </DetailRow>
+          {job.result && (
+            <DetailRow label="Result">
+              <pre className="bg-green-50 dark:bg-green-950 rounded-lg p-3 text-xs font-mono overflow-auto max-h-48 whitespace-pre-wrap text-green-800 dark:text-green-200 border border-green-100 dark:border-green-900">
+                {prettyJson(job.result)}
+              </pre>
+            </DetailRow>
+          )}
+          {job.error && (
+            <DetailRow label="Error">
+              <pre className="bg-red-50 dark:bg-red-950 rounded-lg p-3 text-xs font-mono overflow-auto max-h-48 whitespace-pre-wrap text-red-700 dark:text-red-300 border border-red-100 dark:border-red-900">
+                {job.error}
+              </pre>
+            </DetailRow>
+          )}
+        </dl>
       </div>
-
-      <p className="text-xs text-gray-400 text-center">Auto-refreshes every 5 seconds</p>
     </div>
   );
 }
