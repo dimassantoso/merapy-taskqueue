@@ -261,7 +261,7 @@ export default function Page() {
                       </div>
                     </td>
                     <td className="px-5 py-4 text-right">
-                      <div className="flex justify-end items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex justify-end items-center gap-1">
                         <button onClick={() => router.push(`/task?task_name=${encodeURIComponent(task.name)}`)}
                           className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors">
                           View Jobs
