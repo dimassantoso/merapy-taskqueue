@@ -1,6 +1,6 @@
-# kapynis-taskqueue-dashboard
+# merapy-taskqueue-dashboard
 
-Dashboard for monitoring and managing [kapynis](https://github.com/dimassantoso/kapynis) task queue worker jobs.
+Dashboard for monitoring and managing [kapynis](https://github.com/dimassantoso/merapy) task queue worker jobs.
 
 ## Requirements
 
@@ -38,7 +38,7 @@ Set `NEXT_PUBLIC_GRAPHQL_HOST=http://localhost:8080/graphql` in `.env.local` (al
 
 ## How it works
 
-When `USE_TASK_QUEUE_WORKER=true`, the kapynis task queue worker automatically serves:
+When `USE_TASK_QUEUE_WORKER=true`, the merapy task queue worker automatically serves:
 - `http://localhost:8080/` — this dashboard UI
 - `http://localhost:8080/graphql` — GraphQL API
 
@@ -48,9 +48,9 @@ No separate process needed — just `make run` in your service.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `NEXT_PUBLIC_GRAPHQL_HOST` | `http://localhost:8080/graphql` | kapynis task queue GraphQL endpoint |
+| `NEXT_PUBLIC_GRAPHQL_HOST` | `http://localhost:8080/graphql` | merapy task queue GraphQL endpoint |
 
-The GraphQL endpoint is served by the kapynis task queue worker on `TASK_QUEUE_DASHBOARD_PORT` (default `8080`).
+The GraphQL endpoint is served by the merapy task queue worker on `TASK_QUEUE_DASHBOARD_PORT` (default `8080`).
 
 ## Features
 

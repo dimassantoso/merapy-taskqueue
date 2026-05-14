@@ -26,7 +26,7 @@ export default function Navbar() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
             </svg>
           </div>
-          <span className="font-semibold text-gray-900 dark:text-white text-sm">Kapynis Task Queue</span>
+          <span className="font-semibold text-gray-900 dark:text-white text-sm">Merapy Task Queue</span>
         </Link>
 
         <div className="flex items-center gap-3">

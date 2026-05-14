@@ -1,6 +1,6 @@
 /**
  * Thin GraphQL client — plain fetch, no Apollo dependency.
- * Connects to the kapynis task queue worker GraphQL API.
+ * Connects to the merapy task queue worker GraphQL API.
  */
 
 const GQL_HOST =

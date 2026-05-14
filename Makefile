@@ -1,7 +1,7 @@
 .PHONY: dev build embed clean
 
 KAPYNIS_DIR ?= $(shell cd .. && pwd)/kapynis
-EMBED_TARGET = $(KAPYNIS_DIR)/src/kapynis/codebase/app/task_queue_worker/dashboard_static
+EMBED_TARGET = $(KAPYNIS_DIR)/src/merapy/codebase/app/task_queue_worker/dashboard_static
 
 dev:
 	npm run dev

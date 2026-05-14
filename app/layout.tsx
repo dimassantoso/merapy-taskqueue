@@ -5,7 +5,7 @@ import ThemeProvider from "@/components/ThemeProvider";
 import Navbar from "@/components/Navbar";
 
 export const metadata: Metadata = {
-  title: "Kapynis Task Queue",
+  title: "Merapy Task Queue",
   description: "Real-time task queue worker dashboard",
 };
 
