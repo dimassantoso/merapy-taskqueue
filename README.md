@@ -1,11 +1,11 @@
 # merapy-taskqueue-dashboard
 
-Dashboard for monitoring and managing [kapynis](https://github.com/dimassantoso/merapy) task queue worker jobs.
+Dashboard for monitoring and managing [merapy](https://github.com/dimassantoso/merapy) task queue worker jobs.
 
 ## Requirements
 
 - Node.js 18+
-- A running kapynis service with `USE_TASK_QUEUE_WORKER=true`
+- A running merapy service with `USE_TASK_QUEUE_WORKER=true`
 
 ## Setup
 
@@ -14,19 +14,19 @@ npm install
 cp .env.sample .env.local
 ```
 
-## Embedding into kapynis (one-time, for maintainers)
+## Embedding into merapy (one-time, for maintainers)
 
-This mirrors candi's `embed.FS` approach — the dashboard is bundled inside the kapynis package so users get it automatically with `pip install kapynis`.
+This mirrors candi's `embed.FS` approach — the dashboard is bundled inside the merapy package so users get it automatically with `pip install merapy`.
 
 ```bash
-# From this repo, with ../kapynis pointing to the kapynis repo:
+# From this repo, with ../merapy pointing to the merapy repo:
 make embed
 
-# Or specify the kapynis path explicitly:
-make embed KAPYNIS_DIR=/path/to/kapynis
+# Or specify the merapy path explicitly:
+make embed MERAPY_DIR=/path/to/merapy
 ```
 
-Then commit the generated `dashboard_static/` directory in the kapynis repo.
+Then commit the generated `dashboard_static/` directory in the merapy repo.
 
 ## Development
 
