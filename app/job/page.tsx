@@ -154,7 +154,21 @@ function JobPage() {
           </DetailRow>
           {job.trace_id && (
             <DetailRow label="Trace ID">
-              <span className="font-mono text-xs text-gray-600 dark:text-gray-400">{job.trace_id}</span>
+              {process.env.NEXT_PUBLIC_JAEGER_BASE_URL ? (
+                <a
+                  href={`${process.env.NEXT_PUBLIC_JAEGER_BASE_URL}/trace/${job.trace_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-xs text-indigo-600 dark:text-indigo-400 hover:underline break-all flex items-center gap-1"
+                >
+                  {job.trace_id}
+                  <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+              ) : (
+                <span className="font-mono text-xs text-gray-600 dark:text-gray-400 break-all">{job.trace_id}</span>
+              )}
             </DetailRow>
           )}
           <DetailRow label="Arguments">
