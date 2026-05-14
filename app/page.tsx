@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSubscription } from "@/lib/useSubscription";
 import StatusBadge from "@/components/StatusBadge";
 import {
-  gql, GET_ALL_TASK, ADD_JOB, RETRY_ALL_JOB, CLEAN_JOB,
+  gql, GET_ALL_TASK, ADD_JOB, RETRY_ALL_JOB, CLEAN_JOB, STOP_ALL_JOB,
   SUBSCRIBE_TASK_DASHBOARD,
   type Task, type SubscribeTaskDashboardData, type TaskListData,
 } from "@/lib/graphql";
@@ -266,6 +266,17 @@ export default function Page() {
                           className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors">
                           View Jobs
                         </button>
+                        {(task.detail.queueing > 0 || task.detail.retrying > 0) && (
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Stop all running/queued jobs for "${task.name}"?`)) return;
+                              await gql(STOP_ALL_JOB, { task_name: task.name });
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900 transition-colors"
+                            title="Stop all running/queued jobs">
+                            ⏹
+                          </button>
+                        )}
                         <button
                           onClick={async () => {
                             if (!confirm(`Retry all failure/stopped jobs for "${task.name}"?`)) return;
