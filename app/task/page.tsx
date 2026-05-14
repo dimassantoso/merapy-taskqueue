@@ -346,20 +346,16 @@ function TaskPage() {
                           className="px-2 py-1 rounded border border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                           Detail
                         </button>
-                        {canRetry(job.status) && (
-                          <button onClick={() => act(() => gql(RETRY_JOB, { job_id: job.id }), job.id)}
-                            disabled={actionId === job.id}
-                            className="px-2 py-1 rounded border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs hover:bg-blue-100 dark:hover:bg-blue-900 disabled:opacity-50 transition-colors">
-                            Retry
-                          </button>
-                        )}
-                        {canStop(job.status) && (
-                          <button onClick={() => act(() => gql(STOP_JOB, { job_id: job.id }), job.id)}
-                            disabled={actionId === job.id}
-                            className="px-2 py-1 rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 text-xs hover:bg-amber-100 dark:hover:bg-amber-900 disabled:opacity-50 transition-colors">
-                            Stop
-                          </button>
-                        )}
+                        <button onClick={() => act(() => gql(RETRY_JOB, { job_id: job.id }), job.id)}
+                          disabled={actionId === job.id || !canRetry(job.status)}
+                          className="px-2 py-1 rounded border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs hover:bg-blue-100 dark:hover:bg-blue-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                          Retry
+                        </button>
+                        <button onClick={() => act(() => gql(STOP_JOB, { job_id: job.id }), job.id)}
+                          disabled={actionId === job.id || !canStop(job.status)}
+                          className="px-2 py-1 rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 text-xs hover:bg-amber-100 dark:hover:bg-amber-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                          Stop
+                        </button>
                         <button onClick={() => {
                           if (!confirm("Permanently delete this job?")) return;
                           act(() => gql(DELETE_JOB, { job_id: job.id }), job.id);

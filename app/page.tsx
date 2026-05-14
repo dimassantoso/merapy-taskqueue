@@ -266,23 +266,21 @@ export default function Page() {
                           className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors">
                           View Jobs
                         </button>
-                        {(task.detail.queueing > 0 || task.detail.retrying > 0) && (
-                          <button
-                            onClick={async () => {
-                              if (!confirm(`Stop all running/queued jobs for "${task.name}"?`)) return;
-                              await gql(STOP_ALL_JOB, { task_name: task.name });
-                            }}
-                            className="px-2.5 py-1.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900 transition-colors"
-                            title="Stop all running/queued jobs">
-                            ⏹
-                          </button>
-                        )}
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Stop all running/queued jobs for "${task.name}"?`)) return;
+                            await gql(STOP_ALL_JOB, { task_name: task.name });
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900 transition-colors"
+                          title="Stop all running/queued jobs">
+                          ⏹
+                        </button>
                         <button
                           onClick={async () => {
                             if (!confirm(`Retry all failure/stopped jobs for "${task.name}"?`)) return;
                             await gql(RETRY_ALL_JOB, { filter: { task_name: task.name, statuses: ["FAILURE", "STOPPED"] } });
                           }}
-                          className="px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                          className="px-2.5 py-1.5 rounded-lg border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950 text-xs text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
                           title="Retry all failed/stopped">
                           🔄
                         </button>
