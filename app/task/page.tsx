@@ -6,7 +6,7 @@ import StatusBadge from "@/components/StatusBadge";
 import { useSubscription } from "@/lib/useSubscription";
 import {
   gql, GET_ALL_JOB, GET_COUNT_JOB, ADD_JOB, RETRY_JOB, STOP_JOB, DELETE_JOB,
-  RETRY_ALL_JOB, CLEAN_JOB, STOP_ALL_JOB, SUBSCRIBE_ALL_JOB,
+  RETRY_ALL_JOB, RETRY_ALL_JOB_FORCE, CLEAN_JOB, STOP_ALL_JOB, SUBSCRIBE_ALL_JOB,
   canRetry, canStop,
   type Job, type JobMeta, type SubscribeAllJobData,
 } from "@/lib/graphql";
@@ -272,7 +272,14 @@ function TaskPage() {
           </button>
           <button onClick={() => setModal("retry")}
             className="px-3 py-2 rounded-lg border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs font-medium hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors">
-            🔄 Retry All
+            🔄 Retry Failed
+          </button>
+          <button onClick={async () => {
+            if (!confirm(`Retry ALL jobs for "${taskName}" regardless of status?`)) return;
+            await gql(RETRY_ALL_JOB_FORCE, { task_name: taskName });
+          }}
+            className="px-3 py-2 rounded-lg border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-xs font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors">
+            ⚡ Retry All
           </button>
           <button onClick={async () => {
             if (!confirm(`Stop all running/queued jobs for "${taskName}"?`)) return;

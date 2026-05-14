@@ -53,6 +53,14 @@ export const GET_COUNT_JOB = /* GraphQL */ `
   }
 `;
 
+export const GET_WORKER_STATS = /* GraphQL */ `
+  query GetWorkerStats {
+    get_worker_stats {
+      memory_rss_mb memory_vms_mb memory_percent cpu_percent
+    }
+  }
+`;
+
 // ---------------------------------------------------------------------------
 // Subscriptions (real-time push over WebSocket)
 // ---------------------------------------------------------------------------
@@ -60,11 +68,12 @@ export const GET_COUNT_JOB = /* GraphQL */ `
 export const SUBSCRIBE_TASK_DASHBOARD = /* GraphQL */ `
   subscription ListenTaskDashboard($page: Int!, $limit: Int!, $search: String) {
     listen_task_dashboard(page: $page, limit: $limit, search: $search) {
-      meta { page limit total_pages total_records }
+      meta { page limit total_pages total_records total_client_subscriber }
       data {
         name module_name total_jobs is_loading
         detail { queueing retrying success failure stopped }
       }
+      stats { memory_rss_mb memory_vms_mb memory_percent cpu_percent }
     }
   }
 `;
@@ -117,6 +126,13 @@ export const STOP_ALL_JOB = /* GraphQL */ `
 export const RETRY_ALL_JOB = /* GraphQL */ `
   mutation RetryAllJob($filter: FilterMutateJobInputResolver!) {
     retry_all_job(filter: $filter)
+  }
+`;
+
+/** Re-queue ALL jobs for a task regardless of status */
+export const RETRY_ALL_JOB_FORCE = /* GraphQL */ `
+  mutation RetryAllJobForce($task_name: String!) {
+    retry_all_job(filter: { task_name: $task_name, statuses: [] })
   }
 `;
 
@@ -185,9 +201,23 @@ export interface TaskListData {
 
 export interface SubscribeTaskDashboardData {
   listen_task_dashboard: {
-    meta: { page: number; limit: number; total_pages: number; total_records: number };
+    meta: {
+      page: number;
+      limit: number;
+      total_pages: number;
+      total_records: number;
+      total_client_subscriber: number;
+    };
     data: Task[];
+    stats: WorkerStats;
   };
+}
+
+export interface WorkerStats {
+  memory_rss_mb: number;
+  memory_vms_mb: number;
+  memory_percent: number;
+  cpu_percent: number;
 }
 
 export interface SubscribeAllJobData {

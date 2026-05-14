@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { useSubscription } from "@/lib/useSubscription";
 import StatusBadge from "@/components/StatusBadge";
 import {
-  gql, GET_ALL_TASK, ADD_JOB, RETRY_ALL_JOB, CLEAN_JOB, STOP_ALL_JOB,
+  gql, GET_ALL_TASK, ADD_JOB, RETRY_ALL_JOB, RETRY_ALL_JOB_FORCE, CLEAN_JOB, STOP_ALL_JOB,
   SUBSCRIBE_TASK_DASHBOARD,
-  type Task, type SubscribeTaskDashboardData, type TaskListData,
+  type Task, type WorkerStats, type SubscribeTaskDashboardData, type TaskListData,
 } from "@/lib/graphql";
 
 // ---------------------------------------------------------------------------
@@ -18,6 +18,49 @@ function StatCard({ label, value, color }: { label: string; value: number; color
     <div className={`rounded-xl border px-4 py-3 flex flex-col gap-0.5 min-w-[110px] ${color}`}>
       <span className="text-2xl font-bold tabular-nums">{value}</span>
       <span className="text-xs opacity-70 font-medium">{label}</span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Memory / CPU stats bar
+// ---------------------------------------------------------------------------
+function StatsBar({ stats, clients }: { stats: WorkerStats | null; clients: number }) {
+  if (!stats) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 text-xs text-gray-500 dark:text-gray-400">
+      <span className="flex items-center gap-1.5">
+        <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+        </svg>
+        <span className="font-medium text-gray-700 dark:text-gray-300">RSS</span>
+        <span className="tabular-nums font-mono">{stats.memory_rss_mb} MB</span>
+      </span>
+      <span className="text-gray-200 dark:text-gray-700">·</span>
+      <span className="flex items-center gap-1.5">
+        <span className="font-medium text-gray-700 dark:text-gray-300">VMS</span>
+        <span className="tabular-nums font-mono">{stats.memory_vms_mb} MB</span>
+      </span>
+      <span className="text-gray-200 dark:text-gray-700">·</span>
+      <span className="flex items-center gap-1.5">
+        <span className="font-medium text-gray-700 dark:text-gray-300">Mem</span>
+        <span className="tabular-nums font-mono">{stats.memory_percent}%</span>
+      </span>
+      <span className="text-gray-200 dark:text-gray-700">·</span>
+      <span className="flex items-center gap-1.5">
+        <svg className="w-3.5 h-3.5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+        <span className="font-medium text-gray-700 dark:text-gray-300">CPU</span>
+        <span className="tabular-nums font-mono">{stats.cpu_percent}%</span>
+      </span>
+      <span className="text-gray-200 dark:text-gray-700">·</span>
+      <span className="flex items-center gap-1.5">
+        <svg className="w-3.5 h-3.5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        <span className="font-medium text-gray-700 dark:text-gray-300">{clients} client{clients !== 1 ? "s" : ""}</span>
+      </span>
     </div>
   );
 }
@@ -107,6 +150,16 @@ export default function Page() {
     return raw?.listen_task_dashboard?.data ?? raw?.get_all_task ?? [];
   }, [subData]);
 
+  const stats = useMemo(() => {
+    const raw = (subData as any);
+    return raw?.listen_task_dashboard?.stats ?? null;
+  }, [subData]);
+
+  const clientCount: number = useMemo(() => {
+    const raw = (subData as any);
+    return raw?.listen_task_dashboard?.meta?.total_client_subscriber ?? 0;
+  }, [subData]);
+
   // Aggregate — compute from detail fields (always accurate)
   const totals = useMemo(() => tasks.reduce(
     (acc, t) => ({
@@ -165,6 +218,9 @@ export default function Page() {
         <StatCard label="Stopped" value={totals.stopped}
           color="border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300" />
       </div>
+
+      {/* Worker stats bar */}
+      <StatsBar stats={stats} clients={clientCount} />
 
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3">
@@ -283,8 +339,7 @@ export default function Page() {
                           className="px-2.5 py-1.5 rounded-lg border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950 text-xs text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
                           title="Retry all failed/stopped">
                           🔄
-                        </button>
-                        <button
+                        </button>                        <button
                           onClick={async () => {
                             if (!confirm(`Clear all jobs for "${task.name}"?`)) return;
                             await gql(CLEAN_JOB, { filter: { task_name: task.name, statuses: ["SUCCESS", "FAILURE", "STOPPED"] } });
