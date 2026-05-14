@@ -16,7 +16,7 @@ cp .env.sample .env.local
 
 ## Embedding into merapy (one-time, for maintainers)
 
-This mirrors candi's `embed.FS` approach — the dashboard is bundled inside the merapy package so users get it automatically with `pip install merapy`.
+The dashboard is bundled inside the merapy package so users get it automatically with `pip install merapy`.
 
 ```bash
 # From this repo, with ../merapy pointing to the merapy repo:
