@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import "./globals.css";
 import ThemeProvider from "@/components/ThemeProvider";
 import Navbar from "@/components/Navbar";
+import { StatsProvider } from "@/lib/StatsContext";
 
 export const metadata: Metadata = {
   title: "Merapy Task Queue",
@@ -14,10 +15,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className="bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 min-h-screen transition-colors">
         <ThemeProvider>
-          <Navbar />
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-            <Suspense>{children}</Suspense>
-          </main>
+          <StatsProvider>
+            <Navbar />
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+              <Suspense>{children}</Suspense>
+            </main>
+          </StatsProvider>
         </ThemeProvider>
       </body>
     </html>

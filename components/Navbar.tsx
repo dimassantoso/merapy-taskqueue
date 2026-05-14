@@ -2,12 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useStats } from "@/lib/StatsContext";
 
 export default function Navbar() {
   const [dark, setDark] = useState(false);
+  const { serviceTitle } = useStats();
 
   useEffect(() => {
-    setDark(document.documentElement.classList.contains("dark"));
+    const saved = localStorage.getItem("theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const isDark = saved ? saved === "dark" : prefersDark;
+    setDark(isDark);
+    document.documentElement.classList.toggle("dark", isDark);
   }, []);
 
   function toggle() {
@@ -18,21 +24,39 @@ export default function Navbar() {
   }
 
   return (
-    <header className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 sticky top-0 z-30">
+    <header className="border-b border-gray-200/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-          <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
+
+        {/* Brand */}
+        <Link href="/" className="flex items-center gap-3 group min-w-0">
+          {/* Icon */}
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:shadow-indigo-200 dark:group-hover:shadow-indigo-900 transition-shadow">
             <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
             </svg>
           </div>
-          <span className="font-semibold text-gray-900 dark:text-white text-sm">Merapy Task Queue</span>
+
+          {/* Merapy + Task Queue label */}
+          <div className="flex flex-col leading-none flex-shrink-0">
+            <span className="font-semibold text-gray-900 dark:text-white text-sm tracking-tight">Merapy</span>
+            <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium tracking-wide">Task Queue</span>
+          </div>
+
+          {/* Divider + service name — only shown once service name is known */}
+          {serviceTitle && (
+            <>
+              <span className="h-6 w-px bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
+              <span className="font-bold text-sm tracking-widest text-gray-700 dark:text-gray-200 truncate uppercase">
+                {serviceTitle}
+              </span>
+            </>
+          )}
         </Link>
 
-        <div className="flex items-center gap-3">
-          {/* Live indicator */}
-          <span className="hidden sm:flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Live pill */}
+          <span className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1 rounded-full">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Live
           </span>
 

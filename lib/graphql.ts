@@ -57,6 +57,7 @@ export const GET_WORKER_STATS = /* GraphQL */ `
   query GetWorkerStats {
     get_worker_stats {
       memory_rss_mb memory_vms_mb memory_percent cpu_percent
+      merapy_version service_version build_number git_commit build_date
     }
   }
 `;
@@ -73,7 +74,10 @@ export const SUBSCRIBE_TASK_DASHBOARD = /* GraphQL */ `
         name module_name total_jobs is_loading
         detail { queueing retrying success failure stopped }
       }
-      stats { memory_rss_mb memory_vms_mb memory_percent cpu_percent }
+      stats {
+        memory_rss_mb memory_vms_mb memory_percent cpu_percent
+        merapy_version service_name service_version build_number git_commit build_date
+      }
     }
   }
 `;
@@ -218,6 +222,12 @@ export interface WorkerStats {
   memory_vms_mb: number;
   memory_percent: number;
   cpu_percent: number;
+  merapy_version: string;
+  service_name: string;
+  service_version: string;
+  build_number: string;
+  git_commit: string;
+  build_date: string;
 }
 
 export interface SubscribeAllJobData {

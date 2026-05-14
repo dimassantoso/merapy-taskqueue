@@ -200,6 +200,7 @@ function TaskPage() {
   const rawData = (subData as any)?.listen_all_job ?? (subData as any)?.get_all_job ?? null;
   const jobs: Job[] = rawData?.data ?? [];
   const meta: JobMeta = rawData?.meta ?? { page: 1, limit: 10, total_pages: 1, total_records: 0 };
+  const hasStoppable = jobs.some(j => j.status === "QUEUEING" || j.status === "RETRYING");
 
   function setParam(key: string, value: string | undefined) {
     const params = new URLSearchParams(searchParams.toString());
@@ -285,7 +286,9 @@ function TaskPage() {
             if (!confirm(`Stop all running/queued jobs for "${taskName}"?`)) return;
             await gql(STOP_ALL_JOB, { task_name: taskName });
           }}
-            className="px-3 py-2 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 text-xs font-medium hover:bg-amber-100 dark:hover:bg-amber-900 transition-colors">
+            disabled={!hasStoppable}
+            className="px-3 py-2 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 text-xs font-medium hover:bg-amber-100 dark:hover:bg-amber-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title={!hasStoppable ? "No running or queued jobs" : "Stop all running/queued jobs"}>
             ⏹ Stop All
           </button>
           <button onClick={() => setModal("clean")}
