@@ -1,7 +1,7 @@
 .PHONY: dev build embed clean
 
-KAPYNIS_DIR ?= $(shell cd .. && pwd)/kapynis
-EMBED_TARGET = $(KAPYNIS_DIR)/src/merapy/codebase/app/task_queue_worker/dashboard_static
+MERAPY_DIR ?= $(shell cd .. && pwd)/merapy
+EMBED_TARGET = $(MERAPY_DIR)/src/merapy/codebase/app/task_queue_worker/dashboard_static
 
 dev:
 	npm run dev
@@ -9,18 +9,18 @@ dev:
 build:
 	npm run build
 
-# Build and embed the static output directly into the kapynis package.
+# Build and embed the static output directly into the merapy package.
 # This mirrors candi's embed.FS approach — users get the dashboard for free
-# just by installing kapynis, no separate copy step needed.
+# just by installing merapy, no separate copy step needed.
 #
 # Usage:
-#   make embed                          # uses ../kapynis as default
-#   make embed KAPYNIS_DIR=/path/to/kapynis
+#   make embed                          # uses ../merapy as default
+#   make embed MERAPY_DIR=/path/to/merapy
 embed: build
-	@echo "Embedding dashboard into kapynis at $(EMBED_TARGET)"
+	@echo "Embedding dashboard into merapy at $(EMBED_TARGET)"
 	@rm -rf "$(EMBED_TARGET)"
 	@cp -r out "$(EMBED_TARGET)"
-	@echo "✓ Done. Commit $(EMBED_TARGET) to kapynis repo."
+	@echo "✓ Done. Commit $(EMBED_TARGET) to merapy repo."
 
 clean:
 	rm -rf out .next
