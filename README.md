@@ -1,117 +1,100 @@
-# merapy-taskqueue-dashboard
+# merapy-taskqueue
 
-Real-time dashboard for monitoring and managing [merapy](https://github.com/dimassantoso/merapy) task queue worker jobs. Embedded into the merapy package — no separate install needed.
+Standalone async Python task queue with pluggable storage backends (**In-Memory**, **SQLAlchemy**, **MongoDB**, **Redis**) and an embedded real-time GraphQL dashboard built with **Vite + Preact** (~23 KB gzipped).
 
-## Requirements
+Use it in **any** Python project (FastAPI, Starlette, Django, or plain `asyncio`) or as the task queue worker inside [`merapy`](https://github.com/dimassantoso/merapy).
 
-- Node.js 18+
-- A running merapy service with `USE_TASK_QUEUE_WORKER=true`
+![Standalone merapy-taskqueue demo](docs/assets/standalone-taskqueue-demo.gif)
 
-## Setup
+---
 
-```bash
-npm install
-cp .env.sample .env.local
-# Edit .env.local if your service runs on a different host/port
-```
+## Live Dashboard
 
-## Development
+![Merapy Task Queue Dashboard](docs/assets/taskqueue-dashboard-demo.gif)
 
-```bash
-npm run dev   # hot reload at http://localhost:3000
-```
+- Real-time task & job updates over GraphQL WebSocket subscriptions (with automatic HTTP polling fallback).
+- Same-origin auto-detection — works on any port, domain, or HTTPS reverse proxy without rebuilding.
+- One-click **Add Job**, **Retry**, **Retry All**, **Stop**, **Stop All**, **Delete**, and **Clear**.
 
-`NEXT_PUBLIC_GRAPHQL_HOST` defaults to `http://localhost:8080/graphql` — already set in `.env.sample`.
+---
 
-## Embedding into merapy
-
-The dashboard is bundled inside the merapy package so users get it automatically with `pip install merapy`. After any UI change, rebuild and embed:
+## Install
 
 ```bash
-make embed MERAPY_DIR=/path/to/merapy
+# From GitHub
+pip install "merapy-taskqueue @ git+https://github.com/dimassantoso/merapy-taskqueue.git"
+pip install "merapy-taskqueue[sql,metrics] @ git+https://github.com/dimassantoso/merapy-taskqueue.git"
+pip install "merapy-taskqueue[all] @ git+https://github.com/dimassantoso/merapy-taskqueue.git"
 ```
 
-Then commit the updated `dashboard_static/` directory in the merapy repo.
+Available optional extras: `sql` (SQLAlchemy 2.x async), `mongo` (Motor), `redis` (redis.asyncio), `metrics` (psutil), `all`.
 
-## How it works
+---
 
-When `USE_TASK_QUEUE_WORKER=true`, the merapy task queue worker automatically serves:
+## Quickstart
 
-- `http://localhost:8080/` — this dashboard UI
-- `http://localhost:8080/graphql` — GraphQL API + WebSocket subscriptions
+```python
+import asyncio
+from merapy_taskqueue import MemoryJobStore, TaskContext, TaskQueue
 
-No separate process needed — just `make run` in your service.
+tq = TaskQueue(store=MemoryJobStore(), dashboard_port=8080, service_name="billing-app")
 
-## Configuration
+@tq.task("send_email")
+async def send_email(ctx: TaskContext) -> dict[str, bool]:
+    print("Processing job:", ctx.job_id, ctx.arguments)
+    return {"sent": True}
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NEXT_PUBLIC_GRAPHQL_HOST` | `http://localhost:8080/graphql` | merapy task queue GraphQL endpoint |
+async def main() -> None:
+    await tq.enqueue("send_email", {"to": "alice@example.com"})
+    await tq.serve()  # worker loop + dashboard at http://localhost:8080
 
-## Features
-
-### Job management
-- View all registered tasks with live job counts per status
-- Drill into a task to see individual jobs (paginated, filterable by status + search)
-- View full job detail: arguments, result, error, trace ID, timestamps
-- Retry failed/stopped jobs (single or bulk)
-- Stop running/queued jobs (single or bulk) — button disabled when nothing is stoppable
-- Delete individual jobs permanently
-- Bulk clean by task + status filter
-- Add new jobs manually
-
-### Real-time
-- Live updates via GraphQL WebSocket subscriptions (push every 2s)
-- Automatic fallback to HTTP polling if WebSocket unavailable
-- Single shared subscription for the whole app (no duplicate connections)
-
-### Service info panel
-Two-section panel always visible at the top of the dashboard:
-
-**Deployment** — version and build metadata (set via env vars in your CI/CD pipeline):
-| Env var | Displayed as | Example |
-|---------|-------------|---------|
-| `SERVICE_NAME` | Service name in navbar | `USER SERVICE` |
-| `APP_VERSION` | Service Version | `1.4.2` |
-| `BUILD_NUMBER` | Build | `142` |
-| `GIT_COMMIT` | Commit | `a3f9c12` (7-char short SHA) |
-| `BUILD_DATE` | Built | `2026-05-14` |
-
-**Runtime** — live process metrics (requires `psutil` in service venv):
-| Metric | Unit | Description |
-|--------|------|-------------|
-| RSS Memory | auto-scaled (B/KB/MB/GB/TB) | Physical RAM used by the process |
-| Virtual Memory | auto-scaled | Total virtual address space reserved |
-| Memory Usage | % | RSS as % of total system RAM |
-| CPU Usage | % | CPU time since last measurement |
-| Connected Clients | count | Browser tabs subscribed to live feed |
-
-Install psutil for full metrics: `.venv/bin/pip install psutil`
-
-### CI/CD integration (GitHub Actions example)
-```yaml
-env:
-  APP_VERSION: "1.4.2"
-  BUILD_NUMBER: ${{ github.run_number }}
-  GIT_COMMIT: ${{ github.sha }}
-  BUILD_DATE: ${{ github.event.head_commit.timestamp }}
+asyncio.run(main())
 ```
 
-## Status values
+### Pluggable Backends
 
-| Status | Meaning |
-|--------|---------|
-| `QUEUEING` | Waiting to be picked up |
-| `RETRYING` | Currently running / will retry on failure |
-| `SUCCESS` | Completed successfully |
-| `FAILURE` | Failed after max retries |
-| `STOPPED` | Manually stopped |
+| Backend | Class | Notes |
+|---|---|---|
+| In-Memory | `MemoryJobStore()` | Zero external deps — ideal for scripts, dev, and tests |
+| SQL (Postgres/MySQL/SQLite) | `SQLJobStore(async_session_factory)` | Uses `TaskQueueBase` 4-table schema (candi-compatible) |
+| MongoDB | `MongoJobStore(motor_db)` | Full dashboard query & mutation support |
+| Redis | `RedisJobStore(async_redis)` | Full dashboard query & mutation support |
 
-## Button semantics
+### Mount Inside an Existing FastAPI App
 
-| Button | Enabled when |
-|--------|-------------|
-| Retry | Job status is `FAILURE` or `STOPPED` |
-| Stop | Job status is `QUEUEING` or `RETRYING` |
-| Stop All | Task has at least one `QUEUEING` or `RETRYING` job |
-| Delete | Always |
+```python
+from fastapi import FastAPI
+from merapy_taskqueue import MemoryJobStore, TaskQueue
+
+app = FastAPI()
+tq = TaskQueue(store=MemoryJobStore(), dashboard_enabled=False)
+
+@tq.task("resize_image")
+async def resize_image(ctx):
+    ...
+
+app.mount("/tasks", tq.dashboard_app())
+```
+
+---
+
+## Development & Rebuilding the Embedded UI
+
+```bash
+python3.12 -m venv .venv
+make dev
+make test
+
+# Rebuild the Vite + Preact dashboard into src/merapy_taskqueue/dashboard_static/
+make ui-install
+make ui-build
+
+# Rebuild and embed into a sibling merapy checkout
+make embed MERAPY_DIR=../merapy
+```
+
+---
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).

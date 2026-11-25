@@ -1,26 +1,37 @@
-.PHONY: dev build embed clean
+.PHONY: dev ui-install ui-build embed test lint build clean
 
+PYTHON ?= .venv/bin/python
 MERAPY_DIR ?= $(shell cd .. && pwd)/merapy
 EMBED_TARGET = $(MERAPY_DIR)/src/merapy/codebase/app/task_queue_worker/dashboard_static
 
 dev:
-	npm run dev
+	$(PYTHON) -m pip install -e ".[all,dev]"
 
-build:
-	npm run build
+ui-install:
+	cd ui && npm install
 
-# Build and embed the static output directly into the merapy package.
-# This mirrors candi's embed.FS approach — users get the dashboard for free
-# just by installing merapy, no separate copy step needed.
-#
+ui-build:
+	cd ui && npm run build
+
+# Build the Vite + Preact dashboard and embed into both merapy-taskqueue and merapy.
 # Usage:
-#   make embed                          # uses ../merapy as default
+#   make embed
 #   make embed MERAPY_DIR=/path/to/merapy
-embed: build
+embed: ui-build
 	@echo "Embedding dashboard into merapy at $(EMBED_TARGET)"
 	@rm -rf "$(EMBED_TARGET)"
-	@cp -r out "$(EMBED_TARGET)"
-	@echo "✓ Done. Commit $(EMBED_TARGET) to merapy repo."
+	@cp -r src/merapy_taskqueue/dashboard_static "$(EMBED_TARGET)"
+	@echo "Done. Embedded into $(EMBED_TARGET)"
+
+test:
+	$(PYTHON) -m pytest tests -v
+
+lint:
+	$(PYTHON) -m ruff check src tests
+
+build: ui-build
+	$(PYTHON) -m build
 
 clean:
-	rm -rf out .next
+	find . -type d -name __pycache__ -exec rm -rf {} +
+	rm -rf build dist *.egg-info .pytest_cache .ruff_cache .mypy_cache
